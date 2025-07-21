@@ -305,9 +305,7 @@ def train_model_simple(model, train_loader, val_loader, optimizer, device, num_e
                       f"Train loss {train_loss:.3f}, Val loss {val_loss:.3f}")
 
         # Print a sample text after each epoch
-        generate_and_print_sample(
-            model, tokenizer, device, start_context
-        )
+        #generate_and_print_sample(model, tokenizer, device, start_context)
 
     return train_losses, val_losses, track_tokens_seen
 
@@ -439,7 +437,9 @@ def calc_loss_loader(data_loader, model, device, num_batches=None):
     return total_loss / num_batches
 
 
-def plot_losses(epochs_seen, tokens_seen, train_losses, val_losses):
+def plot_losses(train_losses, val_losses, tokens_seen, num_epochs):
+    epochs_seen = torch.linspace(0, num_epochs, len(train_losses))
+
     fig, ax1 = plt.subplots(figsize=(5, 3))
 
     # Plot training and validation loss against epochs
@@ -456,6 +456,6 @@ def plot_losses(epochs_seen, tokens_seen, train_losses, val_losses):
     ax2.set_xlabel("Tokens seen")
 
     fig.tight_layout()  # Adjust layout to make room
-    plt.savefig("loss-plot.pdf")
+    #plt.savefig("loss-plot.pdf")
     plt.show()
 

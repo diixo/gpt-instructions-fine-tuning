@@ -1,6 +1,7 @@
 
 # https://www.kaggle.com/code/umerhaddii/gpt-instruction-fine-tuning/notebook
 
+import re
 import json
 import os
 import urllib.request
@@ -118,10 +119,8 @@ def custom_collate_draft_1(
         # Add an <|endoftext|> token
         new_item += [pad_token_id]
         # Pad sequences to batch_max_length
-        padded = (
-            new_item + [pad_token_id] *
-            (batch_max_length - len(new_item))
-        )
+        padded = new_item + [pad_token_id] * (batch_max_length - len(new_item))
+
         # Via padded[:-1], we remove the extra padded token
         # that has been added via the +1 setting in batch_max_length
         # (the extra padding token will be relevant in later codes)
@@ -162,10 +161,8 @@ def custom_collate_draft_2(
         # Add an <|endoftext|> token
         new_item += [pad_token_id]
         # Pad sequences to max_length
-        padded = (
-            new_item + [pad_token_id] *
-            (batch_max_length - len(new_item))
-        )
+        padded = new_item + [pad_token_id] * (batch_max_length - len(new_item))
+
         inputs = torch.tensor(padded[:-1])  # Truncate the last token for inputs
         targets = torch.tensor(padded[1:])  # Shift +1 to the right for targets
         inputs_lst.append(inputs)
@@ -266,41 +263,39 @@ torch.manual_seed(123)
 
 train_dataset = InstructionDataset(train_data, tokenizer)
 train_loader = DataLoader(
-    train_dataset,
-    batch_size=batch_size,
-    collate_fn=customized_collate_fn,
-    shuffle=True,
-    drop_last=True,
-    num_workers=num_workers
+        train_dataset,
+        batch_size=batch_size,
+        collate_fn=customized_collate_fn,
+        shuffle=True,
+        drop_last=True,
+        num_workers=num_workers
 )
 
 val_dataset = InstructionDataset(val_data, tokenizer)
 val_loader = DataLoader(
-          val_dataset,
-          batch_size=batch_size,
-          collate_fn=customized_collate_fn,
-          shuffle=False,
-          drop_last=False,
-          num_workers=num_workers
+        val_dataset,
+        batch_size=batch_size,
+        collate_fn=customized_collate_fn,
+        shuffle=False,
+        drop_last=False,
+        num_workers=num_workers
 )
 
 test_dataset = InstructionDataset(test_data, tokenizer)
 test_loader = DataLoader(
-          test_dataset,
-          batch_size=batch_size,
-          collate_fn=customized_collate_fn,
-          shuffle=False,
-          drop_last=False,
-          num_workers=num_workers
+        test_dataset,
+        batch_size=batch_size,
+        collate_fn=customized_collate_fn,
+        shuffle=False,
+        drop_last=False,
+        num_workers=num_workers
 )
 
 # print("Train loader:")
 # for inputs, targets in train_loader:
 #   print(inputs.shape, targets.shape)
 
-
 #######################################################################
-
 
 # from gpt_download import download_and_load_gpt2
 # from previous_chapters import GPTModel, load_weights_into_gpt
@@ -322,6 +317,7 @@ model_configs = {
     "gpt2-xl (1558M)": {"emb_dim": 1600, "n_layers": 48, "n_heads": 25},
 }
 
+#CHOOSE_MODEL = "gpt2-small (124M)"
 CHOOSE_MODEL = "gpt2-medium (355M)"
 
 BASE_CONFIG.update(model_configs[CHOOSE_MODEL])
@@ -337,37 +333,30 @@ load_weights_into_gpt(model, params)
 model.eval()
 
 #######################################################################
-
 torch.manual_seed(123)
 
-input_text = format_input(val_data[0])
-print(input_text)
+def test_input():
+    input_text = format_input(val_data[0])
+    print(input_text)
 
-exit(0)
+    ids = text_to_token_ids(input_text, tokenizer)
 
-# from previous_chapters import (
-#     generate,
-#     text_to_token_ids,
-#     token_ids_to_text
-# )
+    token_ids = generate(
+        model=model,
+        idx=ids,
+        max_new_tokens=35,
+        context_size=BASE_CONFIG["context_length"],
+        eos_id=50256,
+    )
 
-token_ids = generate(
-    model=model,
-    idx=text_to_token_ids(input_text, tokenizer),
-    max_new_tokens=35,
-    context_size=BASE_CONFIG["context_length"],
-    eos_id=50256,
-)
+    generated_text = token_ids_to_text(token_ids, tokenizer)
 
-generated_text = token_ids_to_text(token_ids, tokenizer)
-
-response_text = (
-    generated_text[len(input_text):]
-    .replace("### Response:", "")
-    .strip()
-)
-
-print(response_text)
+    response_text = (
+        generated_text[len(input_text):]
+        .replace("### Response:", "")
+        .strip()
+    )
+    print(response_text)
 
 #######################################################################
 
@@ -394,14 +383,22 @@ start_time = time.time()
 
 torch.manual_seed(123)
 
-optimizer = torch.optim.AdamW(model.parameters(), lr=0.00005, weight_decay=0.1)
+#optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5, weight_decay=0.1)
+optimizer = torch.optim.AdamW(model.parameters(), lr=3e-5, weight_decay=0.05)
 
 num_epochs = 2
 
 train_losses, val_losses, tokens_seen = train_model_simple(
-    model, train_loader, val_loader, optimizer, device,
-    num_epochs=num_epochs, eval_freq=5, eval_iter=5,
-    start_context=format_input(val_data[0]), tokenizer=tokenizer
+    model,
+    train_loader,
+    val_loader,
+    optimizer,
+    device,
+    num_epochs=num_epochs,
+    eval_freq=5,
+    eval_iter=5,
+    start_context=format_input(val_data[0]),
+    tokenizer=tokenizer
 )
 
 end_time = time.time()
@@ -413,6 +410,69 @@ print(f"Training completed in {execution_time_minutes:.2f} minutes.")
 
 from gpt_modeling import plot_losses
 
-epochs_tensor = torch.linspace(0, num_epochs, len(train_losses))
-plot_losses(epochs_tensor, tokens_seen, train_losses, val_losses)
+
+plot_losses(train_losses, val_losses, tokens_seen, num_epochs)
+
+################### Extracting and saving responses ###################
+
+torch.manual_seed(123)
+
+for entry in test_data[:3]:
+
+    input_text = format_input(entry)
+
+    token_ids = generate(
+        model=model,
+        idx=text_to_token_ids(input_text, tokenizer).to(device),
+        max_new_tokens=256,
+        context_size=BASE_CONFIG["context_length"],
+        eos_id=50256,
+    )
+    generated_text = token_ids_to_text(token_ids, tokenizer)
+    response_text = (
+        generated_text[len(input_text):]
+        .replace("### Response:", "")
+        .strip()
+    )
+    print(input_text)
+    print(f"\nCorrect response:\n>> {entry['output']}")
+    print(f"\nModel response:\n>> {response_text.strip()}")
+    print("-" * 20)
+
+##########################################################################
+
+# from tqdm import tqdm
+
+# for i, entry in tqdm(enumerate(test_data), total=len(test_data)):
+
+#   input_text = format_input(entry)
+
+#   token_ids = generate(
+#       model=model,
+#       idx=text_to_token_ids(input_text, tokenizer).to(device),
+#       max_new_tokens=256,
+#       context_size=BASE_CONFIG["context_length"],
+#       eos_id=50256,
+#   )
+#   generated_text = token_ids_to_text(token_ids, tokenizer)
+#   response_text = (
+#       generated_text[len(input_text):]
+#       .replace("### Response:", "")
+#       .strip()
+#   )
+
+#   test_data[i]["model_response"] = response_text
+
+# with open("instruction-data-with-responses.json", "w") as file:
+#     json.dump(test_data, file, indent=2)
+
+# print(test_data[0])
+
+
+######################################################################
+# Model saved as gpt2-medium355M-sft.pth
+
+file_name = f"{re.sub(r'[ ()]', '', CHOOSE_MODEL) }-sft.pth"
+torch.save(model.state_dict(), file_name)
+print(f"Model saved as {file_name}")
 

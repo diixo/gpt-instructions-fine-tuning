@@ -4,3 +4,4 @@
 cached*.txt
 
 gpt2/*
+gpt2*-sft.pth
